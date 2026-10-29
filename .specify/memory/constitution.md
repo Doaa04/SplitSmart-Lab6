@@ -1,98 +1,96 @@
-
-
 # SplitSmart Constitution
 
 ## Core Principles
 
-### I. Customer Requirements Are the Product Authority
-The customer request in `UserRequirement.md` is the authoritative source for product
-scope. Features, specifications, design decisions, and acceptance tests MUST preserve
-its stated needs for accounts, groups, expenses, notifications, approval, balances,
-payments, reporting, and supported platforms. Changes to those needs require an
-explicitly reviewed product decision; implementation convenience alone MUST NOT be
-treated as customer approval.
+### 1. Customer Requirements Are the Product Authority
 
-### II. Java 21 and Maven Baseline
-Production code MUST target Java 21 and use Maven as the build and dependency
-management system. The Maven build MUST declare and enforce the intended Java
-release so local and automated builds use a consistent language/API baseline.
-This keeps builds reproducible and limits accidental reliance on a developer's
-local environment.
+The UserRequirement.md file contains the original customer requirements for SplitSmart. The project MUST follow these requirements, including user accounts, groups, expenses, notifications, approvals, balances, payments, reports, and supported platforms.
 
-### III. Object-Oriented Design with UI/Logic Separation
-The design MUST use cohesive classes with explicit responsibilities and controlled
-dependencies. Business rules and application workflows MUST remain independent of
-Java Swing presentation code so they can be tested without constructing or displaying
-the GUI. Swing components MUST delegate business operations to application logic and
-MUST NOT become the source of truth for domain behavior.
+Any changes to the customer requirements MUST be reviewed and approved first. We should not remove or change features just because they are difficult to implement.
 
-### IV. Exact Monetary Arithmetic
-All monetary amounts and calculations MUST use `BigDecimal`; binary floating-point
-types MUST NOT be used for money. The applicable currency, scale, rounding mode, and
-rounding point MUST be explicit wherever a calculation or persistence boundary needs
-them. Tests MUST cover relevant rounding and split-allocation behavior so totals remain
-consistent.
+2. Java 21 and Maven Baseline
 
-### V. Traceability, Verification, and Human Accountability
-Each customer requirement MUST be traceable from its source to the relevant
-specification or design, implementation, and verification evidence. Automated tests
-MUST use JUnit 5 and cover applicable business rules and integration boundaries.
-PlantUML diagrams MUST be kept in source form for documented architecture or
-workflows and updated when those designs change. AI-generated code, tests, diagrams,
-and documentation MUST receive human review and verification before acceptance;
-AI output is a proposal, not approval or evidence of correctness.
+The project MUST use Java 21 for programming and Maven to build the project and manage dependencies.
 
-## Customer Requirements and Implementation Decisions
+Maven MUST be set up to use Java 21 so the project can be built and tested the same way on different computers.
 
-`UserRequirement.md` describes customer requirements, including a primarily
-web-based product and applications that run on Android and iOS. Java 21, Maven,
-Java Swing, JUnit 5, PlantUML, and the design practices in this constitution are
-implementation decisions, not additional customer requirements.
+3. Object-Oriented Design with UI/Logic Separation
 
-Java Swing is a desktop GUI technology and does not, by itself, deliver the
-requested web, Android, or iOS experiences. A Swing implementation MUST NOT be
-represented as satisfying those platform requirements. Before claiming the
-platform scope is fulfilled, the project MUST document and obtain human approval
-for an implementation plan that addresses every requested platform. Any change to
-the customer-stated platform scope requires an explicit product decision.
+The project MUST follow object-oriented programming principles. Each class should have a clear purpose and responsibility.
 
-## Engineering Standards
+The program logic MUST be separate from the Java Swing interface. This makes it easier to test the program without opening the GUI.
 
-Maven MUST provide the standard build, test, and dependency lifecycle for the Java
-application. Tests MUST be runnable through that build and use JUnit 5. Business
-logic tests MUST not depend on Swing windows or interactive UI state. PlantUML
-diagrams MUST be readable and maintained alongside the project documentation or
-design sources they describe.
+Java Swing should be used for the user interface, while the application logic handles calculations and other operations.
 
-Designs and implementations MUST favor clear domain concepts, cohesive
-responsibilities, and explicit boundaries over unnecessary abstractions. Any
-exception to these standards MUST explain the affected requirement, the reason for
-the exception, and how correctness will be verified.
+4. Exact Monetary Arithmetic
 
-## Development and Review Workflow
+The project MUST use BigDecimal for money calculations instead of float or double.
 
-Work MUST identify the customer requirements it addresses and include verification
-that demonstrates the behavior. Changes to calculations MUST include tests for
-monetary precision and applicable rounding. Changes to architecture or workflows
-MUST update their PlantUML diagrams when those diagrams exist.
+The program MUST clearly define the currency and how amounts are rounded. This is important when splitting expenses between multiple people.
 
-Before acceptance, a human reviewer MUST check requirement coverage, test evidence,
-design consistency, and any AI-generated material. Reviews MUST flag unresolved
-conflicts between customer requirements and implementation decisions rather than
-silently treating them as resolved.
+Tests MUST check that calculations and rounding are correct and that the total amounts match.
 
-## Governance
+5. Traceability, Verification, and Human Accountability
 
-This constitution governs project specifications, design, implementation, and
-review. Amendments MUST be reviewed and recorded by updating the version and
-amendment date below. Version changes follow semantic versioning: MAJOR for
-backward-incompatible changes to principles or governance, MINOR for new or
-materially expanded principles or sections, and PATCH for clarifications that do
-not change meaning.
+Each customer requirement MUST be connected to the related specification, design, implementation, and testing.
 
-Reviews MUST verify applicable principles and record justified exceptions.
-The constitution MUST be reconsidered when customer requirements or implementation
-decisions change. The ratification date is currently unknown and MUST be replaced
-with the date of the original project approval when confirmed.
+The project MUST use JUnit 5 to test the program and make sure the main features work correctly.
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): confirm original approval date | **Last Amended**: 2026-10-29
+PlantUML MUST be used to create diagrams that explain the system design and workflows. These diagrams should be updated when the design changes.
+
+Any work created using AI MUST be reviewed by a person before it is accepted. AI-generated results should not be assumed to be correct without checking them.
+
+Customer Requirements and Implementation Decisions
+
+The original customer requirements are listed in UserRequirement.md. The customer wants SplitSmart to work mainly as a web application and also on Android and iOS.
+
+Java 21, Maven, Java Swing, JUnit 5, and PlantUML are tools and technologies chosen for developing the project. They are implementation decisions, not customer requirements.
+
+Java Swing is used for desktop applications, so a Swing application alone does not meet the customer's web and mobile requirements.
+
+The project MUST have a reviewed and approved plan for supporting the requested platforms before claiming that all platform requirements are complete. Any changes to these requirements MUST be approved.
+
+Engineering Standards
+
+Maven MUST be used to build the project, manage dependencies, and run tests.
+
+JUnit 5 MUST be used for testing. Business logic should be tested separately from the Java Swing interface.
+
+PlantUML diagrams MUST be clear and kept with the project documentation. They should be updated whenever the related design changes.
+
+The code should be simple, organized, and easy to understand. Classes should have clear responsibilities, and unnecessary complexity should be avoided.
+
+If any engineering standard cannot be followed, the reason MUST be explained, including which requirement is affected and how the work will be tested.
+
+Development and Review Workflow
+
+Each part of the project MUST follow the related customer requirements and include tests to check that it works correctly.
+
+Money calculations MUST be tested carefully, especially when expenses are split and rounded.
+
+If the system design changes, the related PlantUML diagrams MUST also be updated.
+
+Before accepting any work, a person MUST review the requirements, testing results, design, and AI-generated content.
+
+Any unclear or conflicting requirements MUST be identified instead of making assumptions without approval.
+
+Governance
+
+This constitution explains the main rules that should be followed while developing and reviewing SplitSmart.
+
+If changes are made to these rules, they MUST be reviewed and documented. The version number and amendment date should also be updated.
+
+Version numbers follow these rules:
+
+MAJOR: Important changes to the main principles or rules that are not backward-compatible.
+
+MINOR: New principles or major additions to existing sections.
+
+PATCH: Small corrections or explanations that do not change the original meaning.
+
+Project reviews MUST check that these principles are being followed. Any exceptions should be explained.
+
+The constitution should be reviewed again if the customer requirements or implementation decisions change.
+
+
+
