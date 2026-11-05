@@ -20,6 +20,16 @@ Amounts and percentages: Expense amounts must be greater than zero. Percentage s
 
 Notifications: Group members will receive an in-app notification when an expense is submitted. The notification will show that the expense is waiting for approval.
 
+### Session 2026-11-05: Lab 7 MVP Decisions
+
+The Java Swing MVP uses a shared Spring Boot REST service and PostgreSQL database so group members on different computers see the same expenses, approval decisions, payments, and balances. The service is the source of truth; the desktop client does not keep an independent authoritative copy.
+
+The MVP supports USD only. Monetary values use exact decimal arithmetic (`BigDecimal`) at two fractional digits. Expense shares use the largest fractional remainder method, with ties assigned in ascending stable account ID order, so shares equal the expense total.
+
+By default, one active group manager other than the expense submitter must approve an expense. A group may configure a higher number of required manager approvals. Each approver must be an eligible active manager other than the submitter. Pending expenses do not affect balances; rejection leaves balances unchanged.
+
+These are MVP decisions. The full product requirement for web, Android, and iOS remains separate and is not satisfied by the Swing desktop client alone.
+
 ## Actors
 
 Account holder: A person who signs in and views their own expenses and balances.
@@ -54,15 +64,17 @@ This section lists all the original customer features from UserRequirement.md, i
 
 ### Java Swing MVP Subset (Implementation Decision)
 
-The first version of SplitSmart may be a Java Swing desktop application.
+The first version of SplitSmart is a Java Swing desktop client using a shared Spring Boot REST service and PostgreSQL database. Multiple desktop clients, including clients on different computers, use the same service and system of record.
 
 This version will focus on user accounts, groups, adding and splitting expenses, basic expense approval, balances, payments, and reports.
 
 It will cover FR-001 through FR-005 and FR-008 through FR-013.
 
-Receipt images (FR-006) and notifications (FR-007) may be added later.
+The MVP supports USD only and uses exact `BigDecimal` calculations at cent precision. Largest-remainder rounding allocates extra cents deterministically, breaking ties by ascending stable account ID. The default approval policy requires one active group manager other than the submitter; a group can configure multiple required manager approvals.
 
-This is only a proposed first version. It does not replace the customer's requirement for a web application and Android/iOS apps. A separate plan will be needed for those platforms.
+Receipt images (FR-006) and in-app notifications (FR-007) are deferred from this MVP.
+
+This desktop MVP does not replace the customer's requirement for a primarily web-based product and Android/iOS apps. The shared service provides a future integration point, but separate web and mobile clients and their validation are required to satisfy FR-014 and NFR-001.
 
 ## User Scenarios and Testing
 
@@ -100,15 +112,15 @@ As a group member, I want to add an expense, select who shares it, and have it a
 
 3. FR-006: Given a member adds an expense, when they attach a supported receipt image, then the image is saved with the expense. The receipt is optional.
 
-4. FR-008: Given an expense is waiting for approval, when an authorized approver reviews it, then they can approve or reject it and the decision is recorded.
+4. FR-008: Given an expense is waiting for approval, when an active group manager other than the submitter reviews it, then they can approve or reject it and the decision is recorded.
 
 5. FR-009: Given an expense is pending or rejected, when a member checks balances, then that expense does not affect them.
 
 6. FR-009, FR-010: Given an expense is approved, when a member checks balances, then the system includes the approved expense and the amount owed.
 
-7. FR-008, FR-009: Given a group requires multiple approvals, when only some approvers have approved, then the expense stays pending without changing balances.
+7. FR-008, FR-009: Given a group requires multiple approvals, when only some eligible managers have approved, then the expense stays pending without changing balances.
 
-8. FR-008, FR-009: Given a group requires multiple approvals, when all required approvers approve, then the expense is accepted and included in balances.
+8. FR-008, FR-009: Given a group requires multiple approvals, when the configured number of eligible managers approve, then the expense is accepted and included in balances.
 
 ### User Story 3: Check Balances and Record Payments (Priority: P1)
 
@@ -170,7 +182,7 @@ An expense amount is zero or negative.
 
 Percentage values are missing, negative, or do not add up to 100%.
 
-An expense split creates extra fractions of a cent.
+An expense split creates extra fractions of a cent or a tie for the final cent.
 
 A payment is zero, negative, or greater than the amount owed.
 
@@ -184,7 +196,7 @@ A report has invalid dates or no matching information.
 
 A notification is meant for someone who left the group or disabled the delivery method.
 
-Invalid amounts and percentage splits should be rejected without changing balances. Rounding should use the largest fractional remainder rule so the shares add up correctly.
+For the USD-only MVP, amounts must have no more than two fractional digits. Invalid amounts and percentage splits should be rejected without changing balances. Allocate extra cents using the largest fractional remainder rule, breaking ties by ascending stable account ID, so shares add up exactly.
 
 ## Requirements
 
@@ -198,13 +210,13 @@ FR-003: The system MUST allow a group manager to create and manage groups. New m
 
 FR-004: The system MUST allow users to add expenses with an amount greater than zero, date, description, payer, selected participants, and split method. The payer can be included or excluded from the split.
 
-FR-005: The system MUST support equal and percentage-based expense splitting. Percentages MUST be nonnegative and total exactly 100%. Rounding MUST use the largest fractional remainder rule so the final shares equal the total expense.
+FR-005: The system MUST support equal and percentage-based expense splitting. Percentages MUST be nonnegative and total exactly 100%. In the Java Swing MVP, the system MUST support USD only and calculate money exactly using `BigDecimal` at two fractional digits. Rounding MUST use the largest fractional remainder rule, breaking ties by ascending stable account ID, so the final shares equal the total expense.
 
 FR-006: The system MUST allow users to attach an optional receipt image to an expense.
 
 FR-007: The system MUST notify other current group members through the app immediately when an expense is submitted. The notification MUST show that the expense is waiting for approval.
 
-FR-008: The system MUST allow groups to use one or multiple approval steps. Approval decisions MUST be recorded.
+FR-008: The system MUST allow groups to require one or multiple approvals from eligible active group managers other than the expense submitter. The default MUST require one such manager approval. Approval decisions MUST be recorded.
 
 FR-009: The system MUST only add an expense to balances after all required approvals are complete. Pending or rejected expenses MUST not affect balances.
 
@@ -226,7 +238,7 @@ NFR-002: During usability testing, at least 90% of first-time users MUST be able
 
 NFR-003: With 10,000 expense and payment records, at least 95% of summary and date-filtered report requests MUST display results within 2 seconds under the agreed testing conditions.
 
-NFR-004: Money calculations MUST be accurate. Expense splits and payment changes MUST match the transaction amounts using the supported currency precision.
+NFR-004: Money calculations MUST be accurate. The Java Swing MVP MUST support USD only and calculate expense splits and payment changes using exact decimal arithmetic at two fractional digits; splits MUST match the transaction amount using the deterministic largest-remainder tie-break.
 
 NFR-005: Unauthorized users MUST not be able to access private account or group information. Testing MUST check both allowed and blocked access for every record type.
 
@@ -252,13 +264,9 @@ Notification: Alerts group members when a new expense is submitted.
 
 Report: Shows summaries of expenses, balances, and payments based on selected filters.
 
-### Open Questions
+### Resolved Product Decisions
 
-Which currencies should SplitSmart support? If participants have equal fractional remainders during rounding, how should the extra amount be assigned?
-
-Who should approve expenses by default? Can someone approve their own expense? How should groups set up multiple approval steps?
-
-These questions are still open because the customer has not confirmed the answers.
+The Java Swing MVP decisions about currency, rounding ties, and approval policy are recorded in the Lab 7 clarification above. Broader full-product currency support, if needed, is outside this MVP decision. The full-product platforms remain required independently of the desktop MVP.
 
 ## Success Criteria
 
@@ -286,8 +294,8 @@ Each expense has one payer, and the selected participant shares must add up to t
 
 Reports normally show the requesting user's related expenses, balances, and payments. Users can choose filters for custom reports.
 
-The Java Swing MVP is only a proposed desktop version. It does not replace the required web, Android, and iOS versions.
+The Java Swing MVP is a desktop client using shared server-side persistence. It does not replace the required web, Android, and iOS versions.
 
 The 10,000-record test and 2-second target are proposed performance goals. Testing conditions must be agreed on before confirming results.
 
-The rounding method is based on the clarification decision. Supported currencies and the rule for equal fractional remainders still need confirmation.
+The full product must keep information consistent across clients by using the shared service as its source of truth. The Java Swing MVP is limited to USD and uses the confirmed largest-remainder tie-break and approval policy.

@@ -1,0 +1,165 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class Account {
+  +id: UUID
+  +email: String
+  +passwordHash: String
+  +emailVerifiedAt: Instant
+  +status: AccountStatus
+}
+
+class Group {
+  +id: UUID
+  +name: String
+  +currencyCode: USD
+  +requiredApprovals: int = 1
+}
+
+class Membership {
+  +role: MembershipRole
+  +status: MembershipStatus
+  +joinedAt: Instant
+  +leftAt: Instant
+}
+
+class Invitation {
+  +id: UUID
+  +inviteeEmail: String
+  +status: InvitationStatus
+  +expiresAt: Instant
+}
+
+class Expense {
+  +id: UUID
+  +description: String
+  +expenseDate: LocalDate
+  +amount: BigDecimal
+  +splitMethod: SplitMethod
+  +status: ExpenseStatus
+  +requiredApprovals: int
+}
+
+class ExpenseShare {
+  +amount: BigDecimal
+  +percentage: BigDecimal
+}
+
+class Approval {
+  +id: UUID
+  +decision: ApprovalDecision
+  +decidedAt: Instant
+  +comment: String
+}
+
+class Payment {
+  +id: UUID
+  +amount: BigDecimal
+  +paymentDate: LocalDate
+  +createdAt: Instant
+}
+
+class AuditEvent {
+  +id: UUID
+  +entityType: String
+  +entityId: UUID
+  +action: String
+  +occurredAt: Instant
+}
+
+class ExpenseService {
+  +submitExpense(...)
+  +recordApproval(...)
+}
+
+class BalanceService {
+  +calculateGroupBalances(...)
+}
+
+class ReportService {
+  +generateReport(...)
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum MembershipRole {
+  MANAGER
+  MEMBER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  LEFT
+}
+
+enum SplitMethod {
+  EQUAL
+  PERCENTAGE
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalDecision {
+  APPROVE
+  REJECT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+Account "1" -- "0..*" Membership
+Group "1" -- "0..*" Membership
+Group "1" -- "0..*" Invitation
+Account "1" -- "0..*" Invitation : inviter
+Group "1" -- "0..*" Expense
+Account "1" -- "0..*" Expense : submitter
+Account "1" -- "0..*" Expense : payer
+Expense "1" *-- "1..*" ExpenseShare
+Account "1" -- "0..*" ExpenseShare : participant
+Expense "1" *-- "0..*" Approval
+Account "1" -- "0..*" Approval : eligible manager
+Group "1" -- "0..*" Payment
+Account "1" -- "0..*" Payment : debtor
+Account "1" -- "0..*" Payment : creditor
+Account "1" -- "0..*" Payment : creator
+Group "1" -- "0..*" AuditEvent
+Account "1" -- "0..*" AuditEvent : actor
+
+ExpenseService ..> Expense
+ExpenseService ..> ExpenseShare
+ExpenseService ..> Approval
+BalanceService ..> Expense
+BalanceService ..> ExpenseShare
+BalanceService ..> Payment
+ReportService ..> BalanceService
+ReportService ..> Payment
+
+note right of Group
+USD only. The default requiredApprovals
+is one active manager other than the
+expense submitter. Groups may require
+multiple eligible manager approvals.
+end note
+
+note right of ExpenseShare
+Amounts use BigDecimal at USD cent precision.
+Largest fractional remainder determines
+extra cents; ties use ascending account ID.
+end note
+
+note bottom of BalanceService
+Only approved expenses contribute to balances.
+Pending and rejected expenses are excluded.
+end note
+@enduml

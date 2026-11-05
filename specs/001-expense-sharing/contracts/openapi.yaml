@@ -1,0 +1,692 @@
+openapi: 3.1.0
+info:
+  title: SplitSmart API
+  version: 1.0.0
+  description: >
+    MVP service contract for Swing clients on different computers. The Spring
+    Boot service and PostgreSQL database are the shared source of truth.
+    Monetary values are USD only and represented as decimal strings at cent
+    precision. Future web and mobile clients may use the same API but are not
+    part of the desktop MVP.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      operationId: registerAccount
+      security: []
+      summary: Register an account and send an email verification link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationRequest'
+      responses:
+        '202':
+          description: Registration accepted; verification is pending
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email address is already registered
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      security: []
+      summary: Verify an email using a one-time token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OneTimeTokenRequest'
+      responses:
+        '204':
+          description: Email verified
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /auth/login:
+    post:
+      operationId: login
+      security: []
+      summary: Authenticate a verified account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          description: Invalid credentials or unverified account
+  /auth/password-reset/request:
+    post:
+      operationId: requestPasswordReset
+      security: []
+      summary: Request a password-reset link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '202':
+          description: Request accepted without disclosing whether the email exists
+  /auth/password-reset/complete:
+    post:
+      operationId: completePasswordReset
+      security: []
+      summary: Set a new password with a one-time reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+                  format: password
+      responses:
+        '204':
+          description: Password reset completed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /groups:
+    get:
+      operationId: listGroups
+      summary: List groups for the authenticated account
+      responses:
+        '200':
+          description: Groups the account can access
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createGroup
+      summary: Create a group; the creator becomes its manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /groups/{groupId}:
+    get:
+      operationId: getGroup
+      summary: Get group details for an active member
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /groups/{groupId}/members:
+    get:
+      operationId: listGroupMembers
+      summary: List active group members
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Active group members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Membership'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /groups/{groupId}/members/{accountId}/role:
+    put:
+      operationId: setMemberRole
+      summary: Assign a manager or member role
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [MANAGER, MEMBER]
+      responses:
+        '204':
+          description: Membership role updated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /groups/{groupId}/approval-policy:
+    put:
+      operationId: updateApprovalPolicy
+      summary: Set the number of required manager approvals for future expenses
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requiredApprovals]
+              properties:
+                requiredApprovals:
+                  type: integer
+                  minimum: 1
+                  description: >
+                    Number of distinct active group managers other than an
+                    expense submitter whose approvals are required. The
+                    threshold must be achievable by eligible managers.
+      responses:
+        '204':
+          description: Approval policy updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /groups/{groupId}/invitations:
+    post:
+      operationId: inviteMember
+      summary: Invite a person to a group
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '201':
+          description: Invitation created
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /invitations/accept:
+    post:
+      operationId: acceptInvitation
+      summary: Accept an invitation addressed to the authenticated account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OneTimeTokenRequest'
+      responses:
+        '204':
+          description: Invitation accepted and membership activated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /groups/{groupId}/expenses:
+    get:
+      operationId: listExpenses
+      summary: List expenses visible to an active group member
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Expense'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: submitExpense
+      summary: Submit an expense for approval
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitExpenseRequest'
+      responses:
+        '201':
+          description: Expense created in pending status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /groups/{groupId}/expenses/{expenseId}/approvals:
+    post:
+      operationId: decideExpense
+      summary: Record an approval or rejection by an eligible manager
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [APPROVE, REJECT]
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Decision recorded; current expense state returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /groups/{groupId}/balances:
+    get:
+      operationId: getBalances
+      summary: Calculate balances from approved expenses and recorded payments
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Current member-visible balances in USD
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Balance'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /groups/{groupId}/payments:
+    get:
+      operationId: listPayments
+      summary: List payments visible to an active group member
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      responses:
+        '200':
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: recordPayment
+      summary: Record a payment within the outstanding pairwise balance
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /groups/{groupId}/reports:
+    get:
+      operationId: getReport
+      summary: Generate an authorized group report for a date range
+      parameters:
+        - $ref: '#/components/parameters/GroupId'
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Report for the requested period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid input or disallowed state transition
+    Unauthorized:
+      description: Authentication required
+    Forbidden:
+      description: The authenticated account cannot access this resource
+  schemas:
+    RegistrationRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    OneTimeTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    Session:
+      type: object
+      required: [accessToken, tokenType]
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          description: HTTP bearer token type
+    CreateGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        requiredApprovals:
+          type: integer
+          minimum: 1
+          default: 1
+          description: >
+            Number of distinct active group managers other than an expense
+            submitter whose approvals are required. Defaults to one and must
+            be achievable by eligible managers.
+    Group:
+      type: object
+      required: [id, name, currencyCode, requiredApprovals]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        currencyCode:
+          type: string
+          const: USD
+        requiredApprovals:
+          type: integer
+          minimum: 1
+    Membership:
+      type: object
+      required: [accountId, role, status]
+      properties:
+        accountId:
+          type: string
+        role:
+          type: string
+          enum: [MANAGER, MEMBER]
+        status:
+          type: string
+          enum: [ACTIVE, LEFT]
+    SubmitExpenseRequest:
+      type: object
+      required: [description, expenseDate, amount, payerAccountId, splitMethod, participants]
+      properties:
+        description:
+          type: string
+          minLength: 1
+        expenseDate:
+          type: string
+          format: date
+        amount:
+          type: string
+          pattern: '^(?=.*[1-9])[0-9]+(\.[0-9]{1,2})?$'
+          example: '24.99'
+          description: Positive USD amount with at most two fractional digits.
+        payerAccountId:
+          type: string
+        splitMethod:
+          type: string
+          enum: [EQUAL, PERCENTAGE]
+        participants:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [accountId]
+            properties:
+              accountId:
+                type: string
+              percentage:
+                type: string
+                pattern: '^[0-9]+(\.[0-9]+)?$'
+                description: Nonnegative percentage; percentages must sum exactly to 100.
+    Expense:
+      type: object
+      required: [id, description, expenseDate, amount, currencyCode, payerAccountId, splitMethod, status, participants]
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        expenseDate:
+          type: string
+          format: date
+        amount:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+        currencyCode:
+          type: string
+          const: USD
+        payerAccountId:
+          type: string
+        splitMethod:
+          type: string
+          enum: [EQUAL, PERCENTAGE]
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseShare'
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+        requiredApprovals:
+          type: integer
+          minimum: 1
+          description: Snapshot of the number of eligible manager approvals required for this expense.
+        approvals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approval'
+    ExpenseShare:
+      type: object
+      required: [accountId, amount]
+      properties:
+        accountId:
+          type: string
+        amount:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+        percentage:
+          type: string
+    Approval:
+      type: object
+      required: [approverAccountId, decision, decidedAt]
+      properties:
+        approverAccountId:
+          type: string
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+        comment:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+    Balance:
+      type: object
+      required: [fromAccountId, toAccountId, amount, currencyCode]
+      properties:
+        fromAccountId:
+          type: string
+        toAccountId:
+          type: string
+        amount:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+        currencyCode:
+          type: string
+          const: USD
+    PaymentRequest:
+      type: object
+      required: [fromAccountId, toAccountId, amount, paymentDate]
+      properties:
+        fromAccountId:
+          type: string
+        toAccountId:
+          type: string
+        amount:
+          type: string
+          pattern: '^(?=.*[1-9])[0-9]+(\.[0-9]{1,2})?$'
+          description: Positive USD amount with at most two fractional digits.
+        paymentDate:
+          type: string
+          format: date
+        description:
+          type: string
+    Payment:
+      type: object
+      required: [id, fromAccountId, toAccountId, amount, paymentDate, currencyCode]
+      properties:
+        id:
+          type: string
+        fromAccountId:
+          type: string
+        toAccountId:
+          type: string
+        amount:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+        paymentDate:
+          type: string
+          format: date
+        currencyCode:
+          type: string
+          const: USD
+        description:
+          type: string
+    Report:
+      type: object
+      required: [from, to, expenses, balances, payments]
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        expenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Expense'
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/Balance'
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'

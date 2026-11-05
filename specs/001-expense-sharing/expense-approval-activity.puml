@@ -1,0 +1,50 @@
+@startuml
+|Submitter|
+start
+:Enter expense amount, date, description,\npayer, participants, and split method;
+
+|Spring Boot service|
+:Authenticate request and authorize\nactive group membership;
+if (Authorized?) then (yes)
+  :Validate positive USD amount,\nparticipants, percentages, and payer;
+  if (Input valid?) then (yes)
+    :Calculate shares with exact BigDecimal;\nApply largest-remainder rounding and\nascending account ID tie-break;
+    :In one transaction, store expense as PENDING,\nshares, approval threshold, and audit event;
+  else (no)
+    :Return validation errors;\nPersist nothing;
+    stop
+  endif
+else (no)
+  :Reject request;\nPersist nothing;
+  stop
+endif
+
+|Group manager|
+while (Expense remains PENDING?) is (yes)
+  :Review expense and submit decision;
+
+  |Spring Boot service|
+  :Verify active manager is not the submitter;
+  if (Eligible manager?) then (yes)
+    if (Decision is REJECT?) then (yes)
+      :Record rejection and audit event;\nSet status to REJECTED;
+    else (no - APPROVE)
+      :Record approval and audit event;
+      if (Required approvals reached?) then (yes)
+        :Set status to APPROVED in the transaction;
+        :Expense shares become visible\nto derived balance/report queries;
+      else (no)
+        :Keep status PENDING;\nDo not change balances;
+      endif
+    endif
+  else (no)
+    :Reject decision;\nKeep expense PENDING;
+  endif
+
+  |Group manager|
+endwhile (no)
+
+|Spring Boot service|
+:Return final expense status and recorded decisions;
+stop
+@enduml

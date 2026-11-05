@@ -1,0 +1,31 @@
+@startuml
+left to right direction
+skinparam componentStyle rectangle
+
+actor "Group member" as User
+component "Swing desktop client\n(on each member's computer)" as Swing
+component "Typed REST client" as HttpClient
+component "Spring Boot REST service\nAuthentication + access checks" as Api
+component "Application use cases" as App
+component "Domain rules\nUSD splits / approvals / balances" as Domain
+database "PostgreSQL\nShared system of record" as Db
+component "Email sender adapter\nverification / reset" as Mail
+component "Future web and\nmobile clients" as FutureClients
+
+User --> Swing
+Swing --> HttpClient
+HttpClient --> Api : HTTPS / JSON
+FutureClients --> Api : HTTPS / JSON
+Api --> App
+App --> Domain
+App --> Db : transactional repositories
+App --> Mail : one-time email flows
+
+note right of Db
+All desktop clients use this
+shared database through the
+service. Balances are derived
+from approved expense shares
+and recorded payments.
+end note
+@enduml
